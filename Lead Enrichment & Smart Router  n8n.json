@@ -1,0 +1,670 @@
+{
+  "name": "Lead Enrichment & Smart Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-form",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "9b88fa41-8f9c-42b5-b980-008ea0098d8b",
+      "name": "Webhook: Lead Form",
+      "webhookId": "abbeee05-9946-44d8-9dc1-aae124e71bfe"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/organizations/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"domain\": \"{{ $json.domain }}\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "67412504-66fc-4875-aebb-74ae07894909",
+      "name": "HTTP: Enrich via Apollo",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "p8yxrIjOVIveUaMb",
+          "name": "Apollo"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"content\":\"🚨 Apollo enrichment failed for {{ $('Edit Fields: Normalize Input').first().json.name }} ({{ $('Edit Fields: Normalize Input').first().json.company }}) — lead routed to SMB fallback.\"}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        240
+      ],
+      "id": "93f949cb-e2d2-4c01-b4f0-6029807d4aaf",
+      "name": "HTTP: Log to Discord",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "927e2606-41b7-4952-aabf-d76c573a1449",
+              "name": "firstName",
+              "value": "={{ $json.body.name.split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "2b3e541d-4198-43d2-b78c-b8c62d848a6c",
+              "name": "name",
+              "value": "={{ $json.body.name.trim() }} ",
+              "type": "string"
+            },
+            {
+              "id": "7d8fbd5a-d69a-47a4-bf52-de062a6ca65c",
+              "name": "email",
+              "value": "={{ $json.body.email.trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "a3a65005-d625-4a44-a816-be596c4f9681",
+              "name": "company",
+              "value": "={{ $json.body.company.trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "3ed2093e-7511-4f56-8fab-efab448de5e2",
+              "name": "domain",
+              "value": "={{ ($json.body.domain || $json.body.email.split('@')[1]).toLowerCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5063bd45-d6d8-4879-b32d-4e64ee6f68a3",
+      "name": "Edit Fields: Normalize Input"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dcc54f9e-b1f5-4cc4-97ea-ad28148b17ad",
+              "name": "estimated_num_employees",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "ad0ff852-9683-40ec-b439-390eedcb9ef0",
+              "name": "industry",
+              "value": "unknown",
+              "type": "string"
+            },
+            {
+              "id": "732c6eb0-4b50-4131-ae00-3215ad84b825",
+              "name": "enrichmentStatus",
+              "value": "failed",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        240
+      ],
+      "id": "0907c87d-cb10-41f7-ba2b-0a451d73e326",
+      "name": "Edit Fields: Fallback Defaults"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.organization?.estimated_num_employees ?? $json.estimated_num_employees ?? 0 }}",
+                    "rightValue": 200,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "id": "b3902993-b07b-4c02-b8f9-42afe184857d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Enterprise"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "85608022-646a-4615-aec1-da681c3000fd",
+      "name": "Switch: Lead Router"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#enterprise-leads-n8n",
+          "mode": "name"
+        },
+        "text": "=🏆 *New ENTERPRISE lead!*\n👤 {{ $('Edit Fields: Normalize Input').item.json.name }} ({{ $('Edit Fields: Normalize Input').item.json.email }})\n🏢 {{ $json.organization.name }} — {{ $json.organization.industry }}\n📏 Employees: {{ $json.organization.estimated_num_employees }}\n🌐 {{ $json.organization.primary_domain }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1472,
+        -32
+      ],
+      "id": "6a0f05c5-d728-4cb8-b755-31f09df13603",
+      "name": "Slack: Enterprise Alert",
+      "webhookId": "9b6ab789-2387-4e68-b42c-0609c289a343",
+      "credentials": {
+        "slackApi": {
+          "id": "fhHsGGBvDsP2K9Mk",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appeQ18JJ9BM9UP1f",
+          "mode": "list",
+          "cachedResultName": "n8n Lead Router",
+          "cachedResultUrl": "https://airtable.com/appeQ18JJ9BM9UP1f"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblQvkIKxCStFiCUX",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://airtable.com/appeQ18JJ9BM9UP1f/tblQvkIKxCStFiCUX"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Edit Fields: Normalize Input').first().json.name }}",
+            "Email": "={{ $('Edit Fields: Normalize Input').first().json.email }}",
+            "Company": "={{ $('Edit Fields: Normalize Input').first().json.company }}",
+            "Industry": "={{ $('HTTP: Enrich via Apollo').first().json.organization.industry }}",
+            "Employees": "={{ $('HTTP: Enrich via Apollo').first().json.organization.estimated_num_employees }}",
+            "Tier": "Enterprise",
+            "Status": "Deal Created"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Employees",
+              "displayName": "Employees",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tier",
+              "displayName": "Tier",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Enterprise",
+                  "value": "Enterprise"
+                },
+                {
+                  "name": "SMB",
+                  "value": "SMB"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Deal Created",
+                  "value": "Deal Created"
+                },
+                {
+                  "name": "Drip Started",
+                  "value": "Drip Started"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        -16
+      ],
+      "id": "a76c648e-983d-48ee-bccb-1c674ea72459",
+      "name": "Airtable: Create Enterprise Deal",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "uNHm6qz6W99qLx8r",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appeQ18JJ9BM9UP1f",
+          "mode": "list",
+          "cachedResultName": "n8n Lead Router",
+          "cachedResultUrl": "https://airtable.com/appeQ18JJ9BM9UP1f"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblQvkIKxCStFiCUX",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://airtable.com/appeQ18JJ9BM9UP1f/tblQvkIKxCStFiCUX"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Edit Fields: Normalize Input').first().json.name }}",
+            "Email": "={{ $('Edit Fields: Normalize Input').first().json.email }}",
+            "Company": "={{ $('Edit Fields: Normalize Input').first().json.company }}",
+            "Employees": "={{ $json.organization?.estimated_num_employees ?? $json.estimated_num_employees ?? 0 }}",
+            "Tier": "SMB",
+            "Status": "Drip Started"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Employees",
+              "displayName": "Employees",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Tier",
+              "displayName": "Tier",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Enterprise",
+                  "value": "Enterprise"
+                },
+                {
+                  "name": "SMB",
+                  "value": "SMB"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Deal Created",
+                  "value": "Deal Created"
+                },
+                {
+                  "name": "Drip Started",
+                  "value": "Drip Started"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        224
+      ],
+      "id": "47a5a45f-4b71-48e5-a70f-da6c574f41e1",
+      "name": "Airtable: Add SMB to Drip",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "uNHm6qz6W99qLx8r",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "mail",
+        "fromEmail": "zharkojaneski14@gmail.com",
+        "fromName": "=Zharko",
+        "toEmail": "={{ $('Edit Fields: Normalize Input').first().json.email }}",
+        "subject": "=Welcome, {{ $('Edit Fields: Normalize Input').first().json.firstName }}!",
+        "contentType": "text/html",
+        "contentValue": "=Hi {{ $('Edit Fields: Normalize Input').first().json.firstName }},\n\nThanks for reaching out about {{ $('Edit Fields: Normalize Input').first().json.company }}.\n\nWe help teams in {{ $('HTTP: Enrich via Apollo').first().json.organization?.industry ?? 'your industry' }} automate their lead pipeline — you're in good company.\n\nTalk soon,\nThe Team",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.sendGrid",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        96
+      ],
+      "id": "4e68cbfa-f5b5-4980-8ab2-680edf7b07d4",
+      "name": "SendGrid: Personalized Welcome Email",
+      "credentials": {
+        "sendGridApi": {
+          "id": "DAK9yxbFczl4b4jt",
+          "name": "SendGrid account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook: Lead Form": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields: Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Enrich via Apollo": {
+      "main": [
+        [
+          {
+            "node": "Switch: Lead Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Log to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields: Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Enrich via Apollo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields: Fallback Defaults": {
+      "main": [
+        [
+          {
+            "node": "Switch: Lead Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Lead Router": {
+      "main": [
+        [
+          {
+            "node": "Slack: Enterprise Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Airtable: Add SMB to Drip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Log to Discord": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields: Fallback Defaults",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Enterprise Alert": {
+      "main": [
+        [
+          {
+            "node": "Airtable: Create Enterprise Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable: Create Enterprise Deal": {
+      "main": [
+        [
+          {
+            "node": "SendGrid: Personalized Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable: Add SMB to Drip": {
+      "main": [
+        [
+          {
+            "node": "SendGrid: Personalized Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0fd4dc7d-d969-4551-9639-939a7897cb6d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d509a93c1d920dbbcecfc6a349d71a9da38a9b8d8cbe82c410d04fed44dfac26"
+  },
+  "id": "2N9V5cEcP2dOz43c",
+  "tags": []
+}
