@@ -1,3 +1,14 @@
+<div align="center">
+
+[![n8n](https://img.shields.io/badge/n8n-Workflow%20Automation-EA4B71?logo=n8n\&logoColor=white)](https://n8n.io/)
+[![Apollo.io](https://img.shields.io/badge/Apollo.io-Lead%20Enrichment-2D6CDF?logoColor=white)](https://www.apollo.io/)
+[![Slack](https://img.shields.io/badge/Slack-Notifications-4A154B?logo=slack\&logoColor=white)](https://slack.com/)
+[![Airtable](https://img.shields.io/badge/Airtable-CRM-18BFFF?logo=airtable\&logoColor=white)](https://www.airtable.com/)
+[![SendGrid](https://img.shields.io/badge/SendGrid-Email-1A82E2?logo=sendgrid\&logoColor=white)](https://sendgrid.com/)
+[![Discord](https://img.shields.io/badge/Discord-Error%20Monitoring-5865F2?logo=discord\&logoColor=white)](https://discord.com/)
+
+</div>
+
 # 🎯 Lead Enrichment & Smart Router — n8n Workflow
 
 An end-to-end **RevOps automation** built with **n8n**.
