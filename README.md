@@ -9,7 +9,11 @@
 
 </div>
 
-# 🎯 Lead Enrichment & Smart Router — n8n Workflow
+# 🎯 Lead Enrichment & Smart Router - n8n Workflow
+
+<div align="center">
+  <img src="workflow.gif" alt="Lead Enrichment & Smart Router workflow demo" width="800">
+</div>
 
 An end-to-end **RevOps automation** built with **n8n**.
 
@@ -23,20 +27,13 @@ If the enrichment API fails, **no lead is lost**. The failure is logged to Disco
 
 > **Errors are handled, never fatal.**
 
-This portfolio project demonstrates:
-
-* External API enrichment
-* Credential management
-* Conditional routing with Switch
-* Error-output branching
-* Retries with backoff
-* Cross-node data references
-* Multi-path convergence
-* Graceful degradation
-
 ---
 
 ## 🔄 Architecture
+
+
+![Full workflow canvas in n8n](canvas.png)
+
 
 ```mermaid
 flowchart TD
@@ -131,87 +128,6 @@ The Apollo HTTP request is configured with:
 * **10-second timeout**
 
 This gives the workflow a chance to recover from temporary network or provider failures before entering the error branch.
-
----
-
-## 3. Safe-default routing
-
-When enrichment fails, the workflow applies:
-
-```text
-employees = 0
-industry = "unknown"
-enrichmentStatus = "failed"
-```
-
-The lead therefore routes to the SMB/fallback path.
-
-The principle is:
-
-> **Fail down, not up.**
-
-If company size is unknown, the workflow avoids incorrectly triggering the Enterprise sales process.
-
----
-
-## 4. One expression, two data shapes
-
-The Switch uses one expression that handles both successful Apollo responses and fallback data:
-
-```javascript
-{{ $json.organization?.estimated_num_employees ?? $json.estimated_num_employees ?? 0 }}
-```
-
-It supports both:
-
-```text
-Apollo response:
-$json.organization.estimated_num_employees
-
-Fallback data:
-$json.estimated_num_employees
-```
-
-If neither value exists, it safely falls back to:
-
-```text
-0
-```
-
-This allows both paths to use the same routing rule.
-
----
-
-## 5. Cross-node data references
-
-Some n8n nodes return their own response data, which can replace the original lead fields in the current item.
-
-Downstream nodes can therefore reference the original normalized lead directly:
-
-```javascript
-$('Edit Fields: Normalize Input').first().json.email
-```
-
-This keeps the original lead data available even after intermediate Slack or Airtable nodes have returned their own response data.
-
----
-
-## 6. Least-privilege credentials
-
-Credentials are scoped to the minimum permissions required by each service.
-
-Examples:
-
-* **Slack** → messaging permissions only
-* **Airtable** → access limited to the required base
-* **Apollo** → API access for enrichment
-* **SendGrid** → dedicated API key
-
-All secrets are stored in **n8n's encrypted credential store**.
-
-The exported workflow contains **no credentials**.
-
-The Discord webhook URL has also been replaced with a placeholder in this repository.
 
 ---
 
@@ -327,110 +243,12 @@ The production webhook becomes:
 ```text
 POST /webhook/lead-form
 ```
-
----
-
 # 🧪 Testing
 
-## Enterprise Path
+No external form is needed to test the workflow — the webhook can be simulated directly with PowerShell:
 
-Use a company with **≥ 200 employees**:
+![Simulating the webhook with PowerShell](input-simulate-wehook-lead-incoming-viapowershell.png)
 
-```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:5678/webhook-test/lead-form" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"name":"Ana Smith","email":"ana@shopify.com","company":"Shopify","domain":"shopify.com"}'
-```
-
-Expected flow:
-
-```text
-Webhook
-   ↓
-Normalize
-   ↓
-Apollo Enrichment
-   ↓
-Switch
-   ↓
-Enterprise
-   ↓
-Slack + Airtable
-   ↓
-SendGrid
-```
-
----
-
-## SMB Path
-
-Use a company that enriches successfully but is below the Enterprise threshold:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:5678/webhook-test/lead-form" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"name":"John Doe","email":"john@techstartup.io","company":"Tech Startup","domain":"techstartup.io"}'
-```
-
-Expected flow:
-
-```text
-Webhook
-   ↓
-Normalize
-   ↓
-Apollo Enrichment
-   ↓
-Switch
-   ↓
-SMB
-   ↓
-Airtable
-   ↓
-SendGrid
-```
-
----
-
-## Error Path
-
-Use an intentionally invalid domain so Apollo fails:
-
-```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:5678/webhook-test/lead-form" `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"name":"Walt Small","email":"walt@waltsmallcoxx.example","company":"Walt Small Co","domain":"waltsmallcoxx.example"}'
-```
-
-Expected flow:
-
-```text
-Webhook
-   ↓
-Normalize
-   ↓
-Apollo ❌
-   ↓
-Discord 🚨
-   ↓
-Fallback Defaults
-   ↓
-Switch
-   ↓
-SMB
-   ↓
-Airtable
-   ↓
-SendGrid
-```
-
----
 
 # 📊 Expected Results
 
@@ -443,6 +261,17 @@ SendGrid
 For successful enrichment, **Industry** and **Employees** come from Apollo.
 
 For failed enrichment, the workflow uses the configured fallback values.
+
+**Discord alert received after simulating an enrichment failure. To trigger it, temporarily add `xx` to the Apollo URL:**
+
+![Discord error alert on enrichment failure](discord.png)
+
+### Results in Action
+
+| Slack Alert | Airtable Record | Welcome Email |
+| :---: | :---: | :---: |
+| ![Slack enterprise alert](slack.png) | ![Airtable lead record](airtable.png) | ![SendGrid welcome email](sendgrid.png) |
+
 
 ---
 
@@ -495,24 +324,3 @@ A production implementation could additionally include:
 
 ---
 
-## 🎯 Portfolio Focus
-
-This project demonstrates how an automation can be designed for both the **happy path** and failure scenarios.
-
-The core architectural principle:
-
-```text
-External API Failure
-        ↓
-Handle the Error
-        ↓
-Preserve the Lead
-        ↓
-Apply Safe Defaults
-        ↓
-Continue Processing
-        ↓
-Contact the Lead
-```
-
-> **The automation degrades gracefully instead of simply stopping.**
